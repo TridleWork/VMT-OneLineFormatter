@@ -72,9 +72,9 @@ if __name__ == "__main__":
     vmt_files = scan_vmt_files(location)
 
     if vmt_files:
-        format_files = input("Do you want to format the files? (y/n) ").lower() == "y"
         for file_path, lines in vmt_files:
             print(f"File: {file_path}")
+            format_files = input("Do you want to format the files? (y/n) ").lower() == "y"
             if format_files:
                 format_vmt_file(file_path, lines)
     else:
