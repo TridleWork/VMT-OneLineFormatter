@@ -1,4 +1,11 @@
 ﻿import os
+import re
+
+patterns = [
+    re.compile(r'VertexLitGeneric', re.IGNORECASE),
+    re.compile(r'LightmappedGeneric', re.IGNORECASE),
+    re.compile(r'#')
+]
 
 
 def scan_vmt_files(location):
@@ -16,55 +23,51 @@ def scan_vmt_files(location):
 
 def format_vmt_file(file_path, lines):
     formatted_lines = []
-    current_block = []
     in_block = False
-    shader_name = None
-    original_shader_comment = None
+    header_found = False
 
     for line in lines:
-        line = line.strip()
-        if line.startswith("//"):
-            if "original shader:" in line:
-                original_shader_comment = line
-            else:
-                formatted_lines.append(line)
-        elif line.startswith('"') and line.endswith('"'):
-            if in_block:
-                current_block.append(line)
-            else:
-                if not shader_name:
-                    shader_name = line
-                    formatted_lines.append(shader_name + " {")
-        elif line.startswith("{"):
-            in_block = True
-        elif line.startswith("}"):
-            current_block.append(line)
-            formatted_lines.extend(format_block(original_shader_comment, current_block))
-            current_block = []
-            in_block = False
-            shader_name = None
-            original_shader_comment = None
-        elif in_block:
-            current_block.append(line)
+        stripped_line = line.strip()
 
-    formatted_lines = [line for line in formatted_lines if line.strip()]
+        if (not header_found and any(pattern.search(stripped_line) for pattern in patterns)):
+            header_found = True
+            formatted_lines.append(stripped_line)
+            in_block = True
+        elif stripped_line.startswith("{"):
+            in_block = False
+            formatted_lines.append("{")
+            in_block = True
+        elif stripped_line == "}":
+            formatted_lines.append("}")
+            in_block = False
+        elif in_block and stripped_line:
+            formatted_lines.append("\t" + stripped_line)
+        elif stripped_line:
+            formatted_lines.append(stripped_line)
+
+    if not header_found:
+        formatted_lines.insert(0, '"VertexLitGeneric"')
+        if len(formatted_lines) == 1:
+            formatted_lines.append("{")
+        if formatted_lines[-1] != "}":
+            formatted_lines.append("}")
+
+    final_lines = []
+    in_block = False
+    for line in formatted_lines:
+        if line.strip() == "{":
+            in_block = True
+            final_lines.append(line)
+        elif line.strip() == "}":
+            in_block = False
+            final_lines.append(line)
+        elif in_block:
+            final_lines.append("\t" + line.strip())
+        else:
+            final_lines.append(line.strip())
 
     with open(file_path, "w") as vmt_file:
-        vmt_file.write("\n".join(formatted_lines))
-
-
-def format_block(original_shader_comment, block):
-    formatted_block = []
-    if original_shader_comment:
-        formatted_block.append("\t" + original_shader_comment.strip() + "\n")
-    for line in block:
-        if line.startswith("{"):
-            continue
-        elif line.startswith("}"):
-            formatted_block.append("}\n")
-        else:
-            formatted_block.append("\t" + line.strip() + "\n")
-    return formatted_block
+        vmt_file.write("\n".join(final_lines) + "\n")
 
 
 if __name__ == "__main__":
